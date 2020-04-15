@@ -9,12 +9,10 @@ from rlbottraining.common_graders.timeout import FailOnTimeout
 from rlbottraining.common_graders.compound_grader import CompoundGrader
 from rlbottraining.grading.grader import Grader
 
-
 """
 This file shows how to create Graders which specify when the Exercises finish
 and whether the bots passed the exercise.
 """
-
 
 class DriveToBallGrader(CompoundGrader):
     """
