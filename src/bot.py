@@ -10,91 +10,83 @@ from util.vec import Vec3
 
 class MyBot(BaseAgent):
     MIN_DIST:float = 300
-
-    
-
+    DRAW_PREDICT:bool = False
 
     def initialize_agent(self):
         # This runs once before the bot starts up
-        self.controller_state = SimpleControllerState()
+        self.controller = SimpleControllerState()
+        self.bot_car=None
+        self.bot_pos=None
+        self.bot_yaw=None
+        self.target=None
+        
 
     def get_output(self, packet: GameTickPacket) -> SimpleControllerState:
+        self.bot_car=packet.game_cars[self.index]
+        self.bot_yaw = packet.game_cars[self.index].physics.rotation.yaw
+        self.bot_pos = packet.game_cars[self.index].physics.location
+        
+        ball_location=Vec3(packet.game_ball.physics.location)
+        car_location=Vec3(self.bot_car.physics.location)
+
+        self.target=ball_location
+
         info = self.get_field_info()
+        if self.bot_car.boost<=45:
+            for boost_pad in info.boost_pads:
+                if distanceTo(car_location,boost_pad.location) < self.MIN_DIST:
+                    self.target=boost_pad.location
+                    
 
-        ball_location = Vec3(packet.game_ball.physics.location)
-        my_car = packet.game_cars[self.index]
-        car_location = Vec3(my_car.physics.location)
-        goal_to_score=info.goals[my_car.team]
-        action_display=""
-
-        car_to_ball = ball_location - car_location
-
-        ball_prediction = self.get_ball_prediction_struct()
-
-        
-        
-
-        if ball_prediction is not None:
-            for i in range(0,ball_prediction.num_slices):
-                prediction_slice=ball_prediction.slices[i]
-                predicted_location=prediction_slice.physics.location
-                draw_prediction(self.renderer,packet.game_ball,predicted_location)
-
-        # Find the direction of our car using the Orientation class
-        car_orientation = Orientation(my_car.physics.rotation)
-        car_direction = car_orientation.forward
-
-        steer_correction_radians = find_correction(car_direction, car_to_ball)
-
-        if steer_correction_radians > 0:
-            # Positive radians in the unit circle is a turn to the left.
-            turn = -1.0  # Negative value for a turn to the left.
-            action_display = "turn left"
-        else:
-            turn = 1.0
-            action_display = "turn right"
-
-        self.controller_state.throttle = 1.0
-        self.controller_state.steer = turn
-
-       
-        #Checks distance to the ball and boost the car       
+        car_to_ball=ball_location-car_location
         dist_to_ball=car_to_ball.length()
-        if dist_to_ball <= self.MIN_DIST:
-            self.controller_state.boost=True        
 
-        if ball_location.z > 0:
-            self.controller_state.jump=True
-
-        draw_debug(self.renderer, my_car, packet.game_ball, action_display)
-        draw_debug_goal(self.renderer,my_car,goal_to_score)
-
-        return self.controller_state
-
-
-def find_correction(current: Vec3, ideal: Vec3) -> float:
-    # Finds the angle from current to ideal vector in the xy-plane. Angle will be between -pi and +pi.
-
-    # The in-game axes are left handed, so use -x
-    current_in_radians = math.atan2(current.y, -current.x)
-    ideal_in_radians = math.atan2(ideal.y, -ideal.x)
-
-    diff = ideal_in_radians - current_in_radians
-
-    # Make sure that diff is between -pi and +pi.
-    if abs(diff) > math.pi:
-        if diff < 0:
-            diff += 2 * math.pi
+        ball_pos = packet.game_ball.physics.location
+        if self.bot_car.boost>45 and dist_to_ball<self.MIN_DIST:
+            self.target=ball_pos
+            self.controller.boost=True
         else:
-            diff -= 2 * math.pi
+            self.controller.boost=False
 
-    return diff
+        if ball_location.z >0:
+            self.controller.jump=True
+        else:
+            self.controller.jump=False
+
+        self.controller.throttle = 1.0
+        self.aim(self.target.x,self.target.y)
+        return self.controller
+    
+    def aim(self, target_x, target_y):
+        angle_between_bot_and_target = math.atan2(target_y - self.bot_pos.y, target_x - self.bot_pos.x)
+
+        angle_front_to_target = angle_between_bot_and_target - self.bot_yaw
+
+        # Correct the values
+        if angle_front_to_target < -math.pi:
+            angle_front_to_target += 2 * math.pi
+        if angle_front_to_target > math.pi:
+            angle_front_to_target -= 2 * math.pi
+
+        if angle_front_to_target < math.radians(-10):
+            # If the target is more than 10 degrees right from the centre, steer left
+            self.controller.steer = -1
+        elif angle_front_to_target > math.radians(10):
+            # If the target is more than 10 degrees left from the centre, steer right
+            self.controller.steer = 1
+        else:
+            # If the target is less than 10 degrees from the centre, steer straight
+            self.controller.steer = 0
+
+
+def distanceTo(location1,location2):
+    return Vec3(location2.x - location1.x, location2.y - location1.y, location2.z - location1.z).length()
+
 
 def draw_debug_goal(renderer,car,goal):
     renderer.begin_rendering()
     renderer.draw_line_3d(car.physics.location,goal.location,renderer.white())
     renderer.end_rendering()
-
 
 
 def draw_prediction(renderer,ball,predicted_location):
