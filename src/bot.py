@@ -1,16 +1,23 @@
 import math
-from math import sqrt
 
+from math import sqrt
+import QTable
 from rlbot.agents.base_agent import BaseAgent, SimpleControllerState
 from rlbot.utils.structures.game_data_struct import GameTickPacket
 
 from util.orientation import Orientation
 from util.vec import Vec3
-
+'''
+Links interesantes
+https://www.geeksforgeeks.org/epsilon-greedy-algorithm-in-reinforcement-learning/
+https://www.freecodecamp.org/news/an-introduction-to-q-learning-reinforcement-learning-14ac0b4493cc/
+https://rocketleague.fandom.com/wiki/Points
+'''
 
 class MyBot(BaseAgent):
     MIN_DIST:float = 300
     DRAW_PREDICT:bool = False
+    qtable=QTable.QTable()
 
     def initialize_agent(self):
         # This runs once before the bot starts up
@@ -19,6 +26,7 @@ class MyBot(BaseAgent):
         self.bot_pos=None
         self.bot_yaw=None
         self.target=None
+        self.actions=list
         
 
     def get_output(self, packet: GameTickPacket) -> SimpleControllerState:
@@ -55,6 +63,10 @@ class MyBot(BaseAgent):
 
         self.controller.throttle = 1.0
         self.aim(self.target.x,self.target.y)
+
+        self.qtable.addAction(self.controller.throttle,self.controller.steer)
+        if(packet.game_info.game_time_remaining<290.0):
+            self.qtable.saveActions()
         return self.controller
     
     def aim(self, target_x, target_y):
