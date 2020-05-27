@@ -10,8 +10,11 @@ else:
 
 try:
     extractedGameStatesAndControls = createTrainingData.convert_replay_to_game_frames("./replays/EE9B6AFF413722B2DBA18AA4BEAABE03.replay","./replay.json",save_json = True)
-except:
-    print('An exception ocurred')
+except Exception as e:
+    print('======FAILURE======')
+    print(e,"\n")
+    print('======FAILURE======')
+
 
 
 #how to extract game frames data and controls from a previously decompiled .json file:
@@ -30,4 +33,5 @@ except:
 # print(f"This variable contains data for {len(gameData)} game frames in addition to controller input data")
 # print(gameData[500]["GameState"])
 # print(gameData[500]["PlayerData"][0])
+
 
